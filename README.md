@@ -8,6 +8,29 @@ The app works, but it has limitations. Your job is to extend it.
 
 ---
 
+## Submission
+
+**Loom walkthrough (2–3 min):** https://www.loom.com/share/61ee6f7830db4cd69bab517e9881dd7b
+
+**What I built:**
+
+- **Part 1 — Multi-document conversations.** A conversation now holds any number
+  of documents. Upload more at any time via the attach button; switch between
+  them with the document tabs in the reader panel; ask questions that span and
+  attribute across every uploaded file. Existing documents persist when new ones
+  are added.
+- **Part 2 — Verifiable citations + an uncertainty signal.** Answers come with
+  citation chips (document + page) that are **verified against the source text**,
+  not just displayed — click one to jump the reader to that page. When a quote
+  can't be found it's flagged as *unverified*, and when the answer isn't grounded
+  in the documents the response is banner-warned instead of presented as fact.
+
+The reasoning, the data behind Part 2, and what I'd do next are in
+[`DECISIONS.md`](./DECISIONS.md). The supporting data analysis is reproducible in
+[`analysis/`](./analysis/ANALYSIS.md) — run `python analysis/usage_analysis.py`.
+
+---
+
 ## Setup
 
 ### Prerequisites

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import re
 from collections.abc import AsyncIterator
 
 from pydantic_ai import Agent
 
 from takehome.config import settings  # noqa: F401 — triggers ANTHROPIC_API_KEY export
+
+CITATION_MARKER = "<<<CITATIONS>>>"
 
 agent = Agent(
     "anthropic:claude-haiku-4-5-20251001",
@@ -13,11 +14,34 @@ agent = Agent(
         "You are a helpful legal document assistant for commercial real estate lawyers. "
         "You help lawyers review and understand documents during due diligence.\n\n"
         "IMPORTANT INSTRUCTIONS:\n"
-        "- Answer questions based on the document content provided.\n"
-        "- When referencing specific parts of the document, cite the relevant section or clause.\n"
-        "- If the answer is not in the document, say so clearly. Do not fabricate information.\n"
+        "- Answer questions based ONLY on the document content provided. Never use outside knowledge.\n"
         "- Be concise and precise. Lawyers value accuracy over verbosity.\n"
-        "- When you reference specific content, mention the section, clause, or page."
+        "- When several documents are provided, attribute each fact to the document it came "
+        "from, by name.\n"
+        "- If the documents do not contain the answer, say so clearly and plainly. "
+        "Do NOT fabricate clauses, figures, or sections — being wrong is worse than being unsure.\n\n"
+        "CITATIONS (required):\n"
+        f"After your prose answer, output a line containing EXACTLY `{CITATION_MARKER}` and then "
+        "a single JSON object on the following lines, with this shape:\n"
+        '{\n'
+        '  "grounded": true | false,        // is the answer actually supported by the documents?\n'
+        '  "confidence": "high" | "medium" | "low",\n'
+        '  "citations": [\n'
+        '    {\n'
+        '      "document": "<exact filename of the source document>",\n'
+        '      "quote": "<a short phrase copied VERBATIM, character-for-character, from that document>",\n'
+        '      "label": "<optional 2-4 word description, e.g. \'break notice period\'>"\n'
+        '    }\n'
+        '  ]\n'
+        '}\n'
+        "Rules for citations:\n"
+        "- Every factual claim you make about a document MUST be backed by a citation whose "
+        "'quote' is copied EXACTLY from that document (do not paraphrase or normalise the quote — "
+        "it is checked against the source text).\n"
+        "- Keep each quote short (a sentence or clause), enough to locate the passage.\n"
+        "- If the answer is not in the documents: set grounded=false, confidence=low, citations=[].\n"
+        "- Use confidence 'low' when the documents only partially or indirectly address the question.\n"
+        f"- The `{CITATION_MARKER}` line and JSON are mandatory on every response."
     ),
 )
 
@@ -37,25 +61,32 @@ async def generate_title(user_message: str) -> str:
 
 async def chat_with_document(
     user_message: str,
-    document_text: str | None,
+    documents: list[dict[str, str]],
     conversation_history: list[dict[str, str]],
 ) -> AsyncIterator[str]:
     """Stream a response to the user's message, yielding text chunks.
 
-    Builds a prompt that includes document context and conversation history,
-    then streams the response from the LLM.
+    ``documents`` is a list of ``{"filename": ..., "text": ...}`` dicts for every
+    document in the conversation. The prompt labels each one so the model can
+    answer questions that span multiple documents and attribute facts to the
+    correct source.
     """
     # Build the full prompt with context
     prompt_parts: list[str] = []
 
     # Add document context if available
-    if document_text:
+    if documents:
+        filenames = ", ".join(f'"{d["filename"]}"' for d in documents)
         prompt_parts.append(
-            "The following is the content of the document being discussed:\n\n"
-            "<document>\n"
-            f"{document_text}\n"
-            "</document>\n"
+            f"The conversation has {len(documents)} uploaded document(s): {filenames}.\n"
+            "Each document's full text is provided below, wrapped in a <document> tag "
+            "whose 'name' attribute is the exact filename. When you answer, attribute "
+            "facts to the specific document they came from by name.\n"
         )
+        for d in documents:
+            prompt_parts.append(
+                f'<document name="{d["filename"]}">\n{d["text"]}\n</document>\n'
+            )
     else:
         prompt_parts.append(
             "No document has been uploaded yet. If the user asks about a document, "
@@ -82,17 +113,3 @@ async def chat_with_document(
     async with agent.run_stream(full_prompt) as result:
         async for text in result.stream_text(delta=True):
             yield text
-
-
-def count_sources_cited(response: str) -> int:
-    """Count the number of references to document sections, clauses, pages, etc."""
-    patterns = [
-        r"section\s+\d+",
-        r"clause\s+\d+",
-        r"page\s+\d+",
-        r"paragraph\s+\d+",
-    ]
-    count = 0
-    for pattern in patterns:
-        count += len(re.findall(pattern, response, re.IGNORECASE))
-    return count

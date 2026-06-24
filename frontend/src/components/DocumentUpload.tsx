@@ -2,8 +2,15 @@ import { Loader2, Upload } from "lucide-react";
 import { type DragEvent, useCallback, useRef, useState } from "react";
 
 interface DocumentUploadProps {
-	onUpload: (file: File) => void;
+	onUpload: (files: File[]) => void;
 	uploading?: boolean;
+}
+
+function pdfsOnly(files: FileList | null): File[] {
+	return Array.from(files ?? []).filter(
+		(f) =>
+			f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"),
+	);
 }
 
 export function DocumentUpload({
@@ -27,9 +34,9 @@ export function DocumentUpload({
 		(e: DragEvent) => {
 			e.preventDefault();
 			setDragOver(false);
-			const file = e.dataTransfer.files[0];
-			if (file && file.type === "application/pdf") {
-				onUpload(file);
+			const files = pdfsOnly(e.dataTransfer.files);
+			if (files.length > 0) {
+				onUpload(files);
 			}
 		},
 		[onUpload],
@@ -41,9 +48,9 @@ export function DocumentUpload({
 
 	const handleFileChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
-			const file = e.target.files?.[0];
-			if (file) {
-				onUpload(file);
+			const files = pdfsOnly(e.target.files);
+			if (files.length > 0) {
+				onUpload(files);
 			}
 			if (fileInputRef.current) {
 				fileInputRef.current.value = "";
@@ -69,6 +76,7 @@ export function DocumentUpload({
 				ref={fileInputRef}
 				type="file"
 				accept=".pdf"
+				multiple
 				className="hidden"
 				onChange={handleFileChange}
 			/>
