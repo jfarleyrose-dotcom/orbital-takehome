@@ -10,7 +10,7 @@ The app works, but it has limitations. Your job is to extend it.
 
 ## Submission
 
-**Loom walkthrough (2–3 min):** https://www.loom.com/share/61ee6f7830db4cd69bab517e9881dd7b
+**Loom walkthrough (2–3 min):** https://www.loom.com/share/9bd2aa7945f9474fb429a3dae33454eb
 
 **What I built:**
 
